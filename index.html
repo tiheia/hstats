@@ -1,628 +1,300 @@
 <!DOCTYPE html>
 <html lang="no">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Håndballstatistikk - Øyestad</title>
-  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>hStats - Helseoversikt</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #4361ee;
+            --danger: #ef233c;
+            --success: #38b000;
+            --bg: #f8f9fa;
+            --card: #ffffff;
+            --text: #212529;
+            --shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding-bottom: 80px;
+        }
+
+        header {
+            background: var(--primary);
+            color: white;
+            padding: 1rem;
+            text-align: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .container { padding: 1rem; max-width: 600px; margin: auto; }
+        
+        .view { display: none; }
+        .view.active { display: block; animation: fadeIn 0.2s ease-in; }
+
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        .card {
+            background: var(--card);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            box-shadow: var(--shadow);
+        }
+
+        .form-group { margin-bottom: 1rem; }
+        label { display: block; margin-bottom: 0.5rem; font-weight: bold; }
+        input, select {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            box-sizing: border-box;
+            font-size: 1rem;
+        }
+
+        .btn {
+            border: none;
+            width: 100%;
+            padding: 15px;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 10px;
+            font-size: 1rem;
+        }
+
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-success { background: var(--success); color: white; }
+        .btn-danger { background: var(--danger); color: white; }
+
+        /* Navigasjon */
+        .nav-bar {
+            position: fixed;
+            bottom: 0;
+            width: 100%;
+            background: white;
+            display: flex;
+            justify-content: space-around;
+            padding: 10px 0;
+            border-top: 1px solid #ddd;
+        }
+
+        .nav-item {
+            border: none;
+            background: none;
+            color: #666;
+            text-align: center;
+            font-size: 0.75rem;
+            flex: 1;
+        }
+
+        .nav-item.active { color: var(--primary); }
+        .nav-item i { font-size: 1.4rem; display: block; margin-bottom: 2px; }
+        
+        .add-btn i {
+            color: var(--primary);
+            font-size: 2rem;
+            margin-top: -12px;
+        }
+
+        .history-item {
+            border-left: 4px solid var(--primary);
+            padding-left: 10px;
+        }
+    </style>
 </head>
 <body>
-  <div id="root"></div>
-  
-  <script type="text/babel">
-    const { useState, useEffect } = React;
 
-    // Lucide icons as inline SVGs
-    const Play = ({ size = 24 }) => (
-      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <polygon points="5 3 19 12 5 21 5 3"></polygon>
-      </svg>
-    );
-    
-    const Pause = ({ size = 24 }) => (
-      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="6" y="4" width="4" height="16"></rect>
-        <rect x="14" y="4" width="4" height="16"></rect>
-      </svg>
-    );
-    
-    const SkipForward = ({ size = 24 }) => (
-      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <polygon points="5 4 15 12 5 20 5 4"></polygon>
-        <line x1="19" y1="5" x2="19" y2="19"></line>
-      </svg>
-    );
-    
-    const Download = ({ size = 24 }) => (
-      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-        <polyline points="7 10 12 15 17 10"></polyline>
-        <line x1="12" y1="15" x2="12" y2="3"></line>
-      </svg>
-    );
-    
-    const ArrowLeft = ({ size = 24 }) => (
-      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <line x1="19" y1="12" x2="5" y2="12"></line>
-        <polyline points="12 19 5 12 12 5"></polyline>
-      </svg>
-    );
-    
-    const Star = ({ size = 24, className = "" }) => (
-      <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
-      </svg>
-    );
-    
-    const Trash2 = ({ size = 24, className = "" }) => (
-      <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <polyline points="3 6 5 6 21 6"></polyline>
-        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-        <line x1="10" y1="11" x2="10" y2="17"></line>
-        <line x1="14" y1="11" x2="14" y2="17"></line>
-      </svg>
-    );
-    
-    const Edit2 = ({ size = 24, className = "" }) => (
-      <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path>
-      </svg>
-    );
-    
-    const X = ({ size = 24 }) => (
-      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <line x1="18" y1="6" x2="6" y2="18"></line>
-        <line x1="6" y1="6" x2="18" y2="18"></line>
-      </svg>
-    );
+<header>
+    <h1 id="view-title">Dashboard</h1>
+</header>
 
-    const PLAYERS = ['Adrian A', 'Adrian B', 'Demyd', 'Fabian', 'Felix', 'Jacob', 'Jonas', 'Loke', 'Markus', 'Mateo', 'Mats', 'Nicolay', 'Ole', 'Oskar', 'Patrick F', 'Patrick W.', 'Sebastian', 'Stokka', 'Theo', 'Theodor', 'Ulrik'].map(name => ({
-      name,
-      isGoalie: ['Patrick F', 'Theo', 'Ulrik'].includes(name)
-    }));
-
-    function App() {
-      const [screen, setScreen] = useState('setup');
-      const [matchType, setMatchType] = useState('Lokal');
-      const [customHalves, setCustomHalves] = useState(2);
-      const [customMinutes, setCustomMinutes] = useState(25);
-      const [opponent, setOpponent] = useState('');
-      const [selectedPlayers, setSelectedPlayers] = useState([]);
-      const [onCourtPlayers, setOnCourtPlayers] = useState([]);
-      const [isRunning, setIsRunning] = useState(false);
-      const [timeRemaining, setTimeRemaining] = useState(1500);
-      const [currentHalf, setCurrentHalf] = useState(0);
-      const [events, setEvents] = useState([]);
-      const [regStep, setRegStep] = useState('player');
-      const [regData, setRegData] = useState({});
-      const [recentPlayers, setRecentPlayers] = useState([]);
-      const [editingEvent, setEditingEvent] = useState(null);
-      const [showTimeoutDialog, setShowTimeoutDialog] = useState(false);
-
-      const totalHalves = matchType === 'Annet' ? customHalves : 2;
-      const minutesPerHalf = matchType === 'Annet' ? customMinutes : 25;
-
-      useEffect(() => {
-        let interval;
-        if (isRunning && timeRemaining > 0) {
-          interval = setInterval(() => setTimeRemaining(prev => prev - 1), 1000);
-        } else if (timeRemaining === 0 && isRunning) {
-          setIsRunning(false);
-        }
-        return () => clearInterval(interval);
-      }, [isRunning, timeRemaining]);
-
-      const formatTime = (s) => `${Math.floor(s/60).toString().padStart(2,'0')}:${(s%60).toString().padStart(2,'0')}`;
-
-      const getSorted = () => {
-        const g = selectedPlayers.filter(p => PLAYERS.find(pl => pl.name === p)?.isGoalie).sort();
-        const f = selectedPlayers.filter(p => !PLAYERS.find(pl => pl.name === p)?.isGoalie).sort();
-        const onCourtG = g.filter(x => onCourtPlayers.includes(x));
-        const onCourtF = f.filter(x => onCourtPlayers.includes(x));
-        const benchG = g.filter(x => !onCourtPlayers.includes(x));
-        const benchF = f.filter(x => !onCourtPlayers.includes(x));
-        return [...onCourtG, ...onCourtF, ...benchG, ...benchF];
-      };
-
-      const getSortedRecent = () => {
-        const onCourt = recentPlayers.filter(p => onCourtPlayers.includes(p));
-        const g = onCourt.filter(p => PLAYERS.find(pl => pl.name === p)?.isGoalie).sort();
-        const f = onCourt.filter(p => !PLAYERS.find(pl => pl.name === p)?.isGoalie).sort();
-        return [...g, ...f].slice(0, 6);
-      };
-
-      const addEvent = (e) => {
-        if (editingEvent) {
-          setEvents(prev => prev.map(ev => ev.id === editingEvent.id ? { ...ev, ...e } : ev));
-          setEditingEvent(null);
-        } else {
-          setEvents(prev => [...prev, { id: Date.now(), half: currentHalf, ...e }]);
-        }
-        setRegStep('player');
-        setRegData({});
-      };
-
-      const addTimeout = (team) => {
-        setEvents(prev => [...prev, { id: Date.now(), half: currentHalf, action: 'Timeout', player: team }]);
-        setShowTimeoutDialog(false);
-        setIsRunning(false);
-      };
-
-      const deleteEvent = (id) => {
-        setEvents(prev => prev.filter(e => e.id !== id));
-      };
-
-      const startEdit = (event) => {
-        setEditingEvent(event);
-        setRegData({ player: event.player, action: event.action, zone: event.zone, assist: event.assist });
-        if (event.action === 'Teknisk') {
-          setRegStep('player');
-        } else if (event.action === 'Mål' && event.assist) {
-          setRegStep('zone');
-        } else if (event.action === 'Mål') {
-          setRegStep('assist');
-        } else if (event.zone) {
-          setRegStep('zone');
-        } else {
-          setRegStep('action');
-        }
-      };
-
-      const downloadCSV = () => {
-        const headers = ['Omgang', 'Spiller', 'Handling', 'Sone', 'Assist'];
-        const rows = events.map(e => [
-          e.half,
-          e.player,
-          e.action,
-          e.zone || '',
-          e.assist || ''
-        ]);
-        
-        const csv = [headers, ...rows].map(row => row.join(',')).join('\n');
-        const blob = new Blob([csv], { type: 'text/csv' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `haandball_${opponent}_${new Date().toISOString().split('T')[0]}.csv`;
-        a.click();
-      };
-
-      const getStats = (half) => {
-        const evs = events.filter(e => half === 'all' || e.half === half);
-        const zoneCount = (action) => evs.filter(e => e.action === action).reduce((acc, e) => ({ ...acc, [e.zone]: (acc[e.zone] || 0) + 1 }), {});
-        return {
-          goals: evs.filter(e => e.action === 'Mål').length,
-          misses: evs.filter(e => e.action === 'Bom').length,
-          technical: evs.filter(e => e.action === 'Teknisk').length,
-          goalsAgainst: evs.filter(e => e.action === 'Mål imot').length,
-          saves: evs.filter(e => e.action === 'Redning').length,
-          goalZones: zoneCount('Mål'),
-          missZones: zoneCount('Bom'),
-          saveZones: zoneCount('Redning'),
-          againstZones: zoneCount('Mål imot')
-        };
-      };
-
-      if (screen === 'setup') {
-        return (
-          <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-            <div className="max-w-2xl mx-auto bg-white rounded-2xl shadow-xl p-8">
-              <h1 className="text-4xl font-bold text-indigo-900 mb-8 text-center">Håndballstatistikk</h1>
-              <div className="space-y-6">
-                <div>
-                  <label className="block text-lg font-semibold text-gray-700 mb-3">Serie</label>
-                  <div className="grid grid-cols-3 gap-3">
-                    {['Lokal', 'Region', 'Annet'].map(type => (
-                      <button key={type} onClick={() => setMatchType(type)} className={`py-3 px-4 rounded-xl font-medium ${matchType === type ? 'bg-indigo-600 text-white shadow-lg' : 'bg-gray-100 text-gray-700'}`}>
-                        {type}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {matchType === 'Annet' && (
-                  <div className="grid grid-cols-2 gap-4 p-4 bg-indigo-50 rounded-xl">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Antall omganger</label>
-                      <input type="number" min="1" value={customHalves} onChange={(e) => setCustomHalves(parseInt(e.target.value))} className="w-full px-4 py-2 border-2 border-indigo-200 rounded-lg" />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Minutter per omgang</label>
-                      <input type="number" min="1" value={customMinutes} onChange={(e) => setCustomMinutes(parseInt(e.target.value))} className="w-full px-4 py-2 border-2 border-indigo-200 rounded-lg" />
-                    </div>
-                  </div>
-                )}
-
-                <div>
-                  <label className="block text-lg font-semibold text-gray-700 mb-3">Motstander</label>
-                  <input value={opponent} onChange={(e) => setOpponent(e.target.value)} placeholder="Navn på motstanderlag" className="w-full px-4 py-3 border-2 border-indigo-200 rounded-xl text-lg" />
-                </div>
-
-                <div>
-                  <label className="block text-lg font-semibold text-gray-700 mb-3">Velg spillere</label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {PLAYERS.map(({ name, isGoalie }) => (
-                      <button key={name} onClick={() => setSelectedPlayers(prev => prev.includes(name) ? prev.filter(n => n !== name) : [...prev, name])} className={`py-2 px-3 rounded-lg text-left ${selectedPlayers.includes(name) ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700'}`}>
-                        {isGoalie ? '🥅 ' : ''}{name}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {selectedPlayers.length > 0 && (
-                  <button onClick={() => { setCurrentHalf(1); setTimeRemaining(minutesPerHalf * 60); setScreen('lineup'); }} className="w-full py-4 bg-green-600 text-white rounded-xl font-bold text-xl" disabled={!opponent || selectedPlayers.length === 0}>
-                    Start kamp
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-        );
-      }
-
-      if (screen === 'lineup') {
-        return (
-          <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-            <div className="max-w-2xl mx-auto bg-white rounded-2xl shadow-xl p-8">
-              <h2 className="text-3xl font-bold text-indigo-900 mb-2 text-center">Omgang {currentHalf}</h2>
-              <p className="text-gray-600 text-center mb-6">Velg spillere som starter på banen</p>
-              <div className="grid grid-cols-2 gap-3 mb-6">
-                {selectedPlayers.sort().map(p => (
-                  <button key={p} onClick={() => setOnCourtPlayers(prev => prev.includes(p) ? prev.filter(x => x !== p) : [...prev, p])} className={`py-3 px-4 rounded-lg font-medium flex items-center gap-2 ${onCourtPlayers.includes(p) ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-700'}`}>
-                    {onCourtPlayers.includes(p) && <Star size={16} className="fill-current" />}
-                    {PLAYERS.find(pl => pl.name === p)?.isGoalie ? '🥅 ' : ''}{p}
-                  </button>
-                ))}
-              </div>
-              <button onClick={() => { setScreen('match'); setRecentPlayers([]); }} className="w-full py-4 bg-indigo-600 text-white rounded-xl font-bold text-xl" disabled={onCourtPlayers.length === 0}>
-                Start omgang {currentHalf}
-              </button>
-            </div>
-          </div>
-        );
-      }
-
-      if (screen === 'match') {
-        const sorted = getSorted();
-        const isGoalie = PLAYERS.find(p => p.name === regData.player)?.isGoalie;
-        const sortedRecent = getSortedRecent();
-
-        return (
-          <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-            <div className="max-w-2xl mx-auto bg-white rounded-2xl shadow-xl p-6">
-              <div className="flex items-center justify-between mb-6">
-                <div>
-                  <h2 className="text-2xl font-bold text-indigo-900">Øyestad vs {opponent}</h2>
-                  <p className="text-gray-600">Omgang {currentHalf}/{totalHalves}</p>
-                </div>
-                <div className="text-right">
-                  <div className="text-4xl font-bold text-indigo-900">{formatTime(timeRemaining)}</div>
-                  <div className="text-sm text-gray-600">{getStats('all').goals} - {getStats('all').goalsAgainst}</div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-3 gap-3 mb-6">
-                <button onClick={() => setIsRunning(!isRunning)} className={`py-3 rounded-xl font-bold flex items-center justify-center gap-2 ${isRunning ? 'bg-red-600' : 'bg-green-600'} text-white`}>
-                  {isRunning ? <><Pause size={20} /> Pause</> : <><Play size={20} /> Start</>}
-                </button>
-                <button onClick={() => setShowTimeoutDialog(true)} className="py-3 rounded-xl font-bold bg-yellow-600 text-white">
-                  ⏱️ Timeout
-                </button>
-                <button onClick={() => { if (currentHalf < totalHalves) { setCurrentHalf(currentHalf + 1); setTimeRemaining(minutesPerHalf * 60); setScreen('lineup'); setOnCourtPlayers([]); } else { setScreen('summary'); } }} className="py-3 rounded-xl font-bold bg-purple-600 text-white flex items-center justify-center gap-2">
-                  <SkipForward size={20} /> {currentHalf < totalHalves ? 'Neste' : 'Slutt'}
-                </button>
-              </div>
-
-              {showTimeoutDialog && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                  <div className="bg-white rounded-2xl p-6 max-w-sm w-full">
-                    <h3 className="text-2xl font-bold text-gray-900 mb-4">Hvem tok timeout?</h3>
-                    <div className="space-y-3">
-                      <button onClick={() => addTimeout('Øyestad')} className="w-full py-4 bg-indigo-600 text-white rounded-xl font-bold">
-                        Øyestad
-                      </button>
-                      <button onClick={() => addTimeout(opponent)} className="w-full py-4 bg-red-600 text-white rounded-xl font-bold">
-                        {opponent}
-                      </button>
-                      <button onClick={() => setShowTimeoutDialog(false)} className="w-full py-3 bg-gray-200 text-gray-700 rounded-xl font-semibold">
-                        Avbryt
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {regStep === 'player' && (
-                <>
-                  {editingEvent && (
-                    <div className="mb-4 p-3 bg-blue-50 border-2 border-blue-200 rounded-lg flex items-center justify-between">
-                      <span className="text-blue-900 font-semibold">Redigerer hendelse</span>
-                      <button onClick={() => { setEditingEvent(null); setRegData({}); }} className="text-blue-600">
-                        <X size={20} />
-                      </button>
-                    </div>
-                  )}
-                  <h3 className="text-2xl font-bold text-indigo-900 mb-4">Velg spiller</h3>
-                  {sortedRecent.length > 0 && (
-                    <div className="mb-4">
-                      <h4 className="font-semibold text-sm text-gray-600 mb-2">Mest brukte</h4>
-                      <div className="grid grid-cols-3 gap-2">
-                        {sortedRecent.map(p => (
-                          <button key={p} onClick={() => { setRegData({ player: p }); setRegStep('action'); if (!recentPlayers.includes(p)) setRecentPlayers([p, ...recentPlayers]); }} className="py-3 bg-yellow-400 text-gray-900 font-bold rounded-lg flex items-center justify-center gap-1">
-                            <Star size={14} className="fill-current" />
-                            {p}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  <div className="border-t pt-4">
-                    <h4 className="font-semibold text-sm text-gray-600 mb-2">Bytt spillere på banen</h4>
-                    <div className="grid grid-cols-3 gap-2">
-                      {sorted.map(p => (
-                        <button key={p} onClick={() => setOnCourtPlayers(prev => prev.includes(p) ? prev.filter(x => x !== p) : [...prev, p])} className={`py-2 px-2 rounded-lg text-xs flex items-center gap-1 ${onCourtPlayers.includes(p) ? 'bg-yellow-400 text-gray-900 font-semibold' : 'bg-gray-100 text-gray-600'}`}>
-                          {onCourtPlayers.includes(p) && <Star size={12} className="fill-current"/>}
-                          {p}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </>
-              )}
-
-              {regStep === 'action' && (
-                <>
-                  <button onClick={() => { setRegStep('player'); setRegData({}); }} className="mb-4 flex items-center gap-2 text-indigo-600">
-                    <ArrowLeft size={20}/> Tilbake
-                  </button>
-                  <h3 className="text-2xl font-bold text-indigo-900 mb-2">{regData.player}</h3>
-                  <p className="text-gray-600 mb-6">Velg handling</p>
-                  <div className="grid grid-cols-2 gap-3">
-                    {isGoalie ? (
-                      <>
-                        <button onClick={() => { setRegData({ ...regData, action: 'Redning' }); setRegStep('zone'); }} className="py-6 rounded-xl font-bold text-xl bg-green-600 text-white">Redning</button>
-                        <button onClick={() => { setRegData({ ...regData, action: 'Mål imot' }); setRegStep('zone'); }} className="py-6 rounded-xl font-bold text-xl bg-red-600 text-white">Mål imot</button>
-                      </>
-                    ) : (
-                      <>
-                        <button onClick={() => { setRegData({ ...regData, action: 'Mål' }); setRegStep('assist'); }} className="py-6 rounded-xl font-bold text-xl bg-green-600 text-white">Mål</button>
-                        <button onClick={() => { setRegData({ ...regData, action: 'Bom' }); setRegStep('zone'); }} className="py-6 rounded-xl font-bold text-xl bg-red-600 text-white">Bom</button>
-                        <button onClick={() => addEvent({ ...regData, action: 'Teknisk' })} className="py-6 rounded-xl font-bold text-xl bg-yellow-600 text-white col-span-2">Teknisk</button>
-                      </>
-                    )}
-                  </div>
-                </>
-              )}
-
-              {regStep === 'assist' && (
-                <>
-                  <button onClick={() => { setRegStep('action'); setRegData({ player: regData.player }); }} className="mb-4 flex items-center gap-2 text-indigo-600">
-                    <ArrowLeft size={20}/> Tilbake
-                  </button>
-                  <h3 className="text-2xl font-bold text-indigo-900 mb-2">{regData.player} - Mål</h3>
-                  <p className="text-gray-600 mb-6">Hvem hadde assist?</p>
-                  <div className="grid grid-cols-2 gap-3">
-                    <button onClick={() => { setRegData({ ...regData, assist: 'Ingen' }); setRegStep('zone'); }} className="py-4 rounded-xl font-semibold text-lg bg-gray-600 text-white col-span-2">Ingen assist</button>
-                    {onCourtPlayers
-                      .filter(p => p !== regData.player)
-                      .sort((a, b) => {
-                        const aAssists = events.filter(e => e.assist === a).length;
-                        const bAssists = events.filter(e => e.assist === b).length;
-                        if (aAssists !== bAssists) return bAssists - aAssists;
-                        return a.localeCompare(b);
-                      })
-                      .map(p => {
-                        const assistCount = events.filter(e => e.assist === p).length;
-                        return (
-                          <button key={p} onClick={() => { setRegData({ ...regData, assist: p }); setRegStep('zone'); }} className="py-4 rounded-xl font-semibold text-lg bg-indigo-600 text-white relative">
-                            {p}
-                            {assistCount > 0 && (
-                              <span className="absolute top-1 right-1 bg-yellow-400 text-gray-900 text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center">
-                                {assistCount}
-                              </span>
-                            )}
-                          </button>
-                        );
-                      })}
-                  </div>
-                </>
-              )}
-
-              {regStep === 'zone' && (
-                <>
-                  <button onClick={() => { setRegStep(regData.action === 'Mål' ? 'assist' : 'action'); }} className="mb-4 flex items-center gap-2 text-indigo-600">
-                    <ArrowLeft size={20}/> Tilbake
-                  </button>
-                  <h3 className="text-2xl font-bold text-indigo-900 mb-2">{regData.player}</h3>
-                  <p className="text-gray-600 mb-6">{regData.action} - Velg sone</p>
-                  <div className="grid grid-cols-4 gap-3 mb-4">
-                    {[1,2,3,4,5,6,7,8].map(n => (
-                      <button key={n} onClick={() => addEvent({ ...regData, zone: `Sone ${n}` })} className="py-6 bg-blue-600 text-white font-bold rounded-xl text-2xl">{n}</button>
-                    ))}
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <button onClick={() => addEvent({ ...regData, zone: 'Straffekast' })} className="py-4 bg-purple-600 text-white font-bold rounded-xl">Straffekast (7m)</button>
-                    <button onClick={() => addEvent({ ...regData, zone: 'Kontring' })} className="py-4 bg-yellow-600 text-white font-bold rounded-xl">Kontring</button>
-                  </div>
-                </>
-              )}
-
-              <EventLog events={events} currentHalf={currentHalf} deleteEvent={deleteEvent} startEdit={startEdit} />
-            </div>
-          </div>
-        );
-      }
-
-      if (screen === 'summary') {
-        const [summaryHalf, setSummaryHalf] = useState('all');
-        const stats = getStats(summaryHalf);
-
-        return (
-          <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-            <div className="max-w-2xl mx-auto bg-white rounded-2xl shadow-xl p-8">
-              <h2 className="text-3xl font-bold text-indigo-900 mb-2 text-center">Kampsammendrag</h2>
-              <p className="text-gray-600 text-center mb-6">Øyestad vs {opponent}</p>
-
-              <div className="flex gap-2 mb-6 overflow-x-auto">
-                <button onClick={() => setSummaryHalf('all')} className={`px-4 py-2 rounded-lg font-semibold ${summaryHalf === 'all' ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-700'}`}>
-                  Hele kampen
-                </button>
-                {[...Array(totalHalves)].map((_, i) => (
-                  <button key={i+1} onClick={() => setSummaryHalf(i+1)} className={`px-4 py-2 rounded-lg font-semibold ${summaryHalf === i+1 ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-700'}`}>
-                    Omgang {i+1}
-                  </button>
-                ))}
-              </div>
-
-              <div className="space-y-6">
-                <div className="text-center p-6 bg-gradient-to-r from-green-50 to-blue-50 rounded-xl">
-                  <div className="text-5xl font-bold text-indigo-900 mb-2">{stats.goals} - {stats.goalsAgainst}</div>
-                  <div className="text-gray-600">Sluttresultat</div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="p-4 bg-green-50 rounded-xl">
-                    <div className="text-3xl font-bold text-green-700 mb-1">{stats.goals}</div>
-                    <div className="text-sm text-gray-600">Mål scoret</div>
-                  </div>
-                  <div className="p-4 bg-red-50 rounded-xl">
-                    <div className="text-3xl font-bold text-red-700 mb-1">{stats.goalsAgainst}</div>
-                    <div className="text-sm text-gray-600">Mål sluppet inn</div>
-                  </div>
-                  <div className="p-4 bg-blue-50 rounded-xl">
-                    <div className="text-3xl font-bold text-blue-700 mb-1">{stats.saves}</div>
-                    <div className="text-sm text-gray-600">Redninger</div>
-                  </div>
-                  <div className="p-4 bg-yellow-50 rounded-xl">
-                    <div className="text-3xl font-bold text-yellow-700 mb-1">{stats.misses}</div>
-                    <div className="text-sm text-gray-600">Bom</div>
-                  </div>
-                </div>
-
-                <div className="p-4 bg-purple-50 rounded-xl">
-                  <div className="text-2xl font-bold text-purple-700 mb-1">{stats.technical}</div>
-                  <div className="text-sm text-gray-600">Tekniske feil</div>
-                </div>
-
-                {Object.keys(stats.goalZones).length > 0 && (
-                  <div className="space-y-2">
-                    <h3 className="font-bold text-lg text-gray-800">Mål per sone</h3>
-                    <div className="space-y-1">
-                      {Object.entries(stats.goalZones).sort((a, b) => b[1] - a[1]).map(([zone, count]) => (
-                        <div key={zone} className="flex items-center gap-2">
-                          <div className="w-32 text-sm text-gray-700">{zone}</div>
-                          <div className="flex-1 bg-gray-200 rounded-full h-6 relative">
-                            <div className="bg-green-600 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold" style={{ width: `${(count / stats.goals) * 100}%` }}>
-                              {count}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {Object.keys(stats.saveZones).length > 0 && (
-                  <div className="space-y-2">
-                    <h3 className="font-bold text-lg text-gray-800">Redninger per sone</h3>
-                    <div className="space-y-1">
-                      {Object.entries(stats.saveZones).sort((a, b) => b[1] - a[1]).map(([zone, count]) => (
-                        <div key={zone} className="flex items-center gap-2">
-                          <div className="w-32 text-sm text-gray-700">{zone}</div>
-                          <div className="flex-1 bg-gray-200 rounded-full h-6 relative">
-                            <div className="bg-blue-600 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold" style={{ width: `${(count / stats.saves) * 100}%` }}>
-                              {count}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                <div className="grid grid-cols-2 gap-3">
-                  <button onClick={downloadCSV} className="py-4 bg-green-600 text-white rounded-xl font-bold flex items-center justify-center gap-2">
-                    <Download size={20} /> Last ned CSV
-                  </button>
-                  <button onClick={() => { setScreen('setup'); setEvents([]); setCurrentHalf(0); setSelectedPlayers([]); setOnCourtPlayers([]); setOpponent(''); }} className="py-4 bg-indigo-600 text-white rounded-xl font-bold">
-                    Ny kamp
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        );
-      }
-
-      return null;
-    }
-
-    function EventLog({ events, currentHalf, deleteEvent, startEdit }) {
-      const groupedEvents = events.reduce((acc, event) => {
-        if (!acc[event.half]) acc[event.half] = [];
-        acc[event.half].push(event);
-        return acc;
-      }, {});
-
-      const halves = Object.keys(groupedEvents).sort((a, b) => b - a);
-
-      if (events.length === 0) return null;
-
-      return (
-        <div className="border-t pt-4 mt-4">
-          <h4 className="font-semibold text-lg mb-3 text-gray-700">Hendelser</h4>
-          <div className="space-y-4 max-h-96 overflow-y-auto">
-            {halves.map(half => (
-              <div key={half}>
-                {halves.length > 1 && (
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="flex-1 h-px bg-gray-300"></div>
-                    <span className="text-xs font-semibold text-gray-500 px-2">Omgang {half}</span>
-                    <div className="flex-1 h-px bg-gray-300"></div>
-                  </div>
-                )}
-                <div className="space-y-2">
-                  {[...groupedEvents[half]].reverse().map(event => (
-                    <div key={event.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                      <div className="text-sm flex-1">
-                        {event.action === 'Timeout' ? (
-                          <span className="font-semibold text-yellow-700">⏱️ Timeout - {event.player}</span>
-                        ) : (
-                          <>
-                            <span className="font-semibold">{event.player}</span> - {event.action}
-                            {event.zone && ` (${event.zone})`}
-                            {event.assist && event.assist !== 'Ingen' && ` - Assist: ${event.assist}`}
-                          </>
-                        )}
-                      </div>
-                      {event.action !== 'Timeout' && (
-                        <div className="flex gap-2">
-                          <button onClick={() => startEdit(event)} className="p-1 hover:bg-blue-100 rounded">
-                            <Edit2 size={16} className="text-blue-600" />
-                          </button>
-                          <button onClick={() => deleteEvent(event.id)} className="p-1 hover:bg-red-100 rounded">
-                            <Trash2 size={16} className="text-red-600" />
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
+<div class="container">
+    <section id="view-dashboard" class="view active">
+        <div class="card">
+            <h3>Velkommen tilbake</h3>
+            <p id="quick-stats">Laster status...</p>
         </div>
-      );
+    </section>
+
+    <section id="view-add" class="view">
+        <div class="card">
+            <h2>Ny registrering</h2>
+            <form id="event-form">
+                <div class="form-group">
+                    <label>Type</label>
+                    <select id="event-type" required>
+                        <option value="Medisin">Medisin</option>
+                        <option value="Symptom">Symptom</option>
+                        <option value="Vekt">Vekt</option>
+                        <option value="Blodtrykk">Blodtrykk</option>
+                        <option value="Notat">Annet notat</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Verdi / Beskrivelse</label>
+                    <input type="text" id="event-value" placeholder="F.eks. 10mg eller 'Litt hodepine'" required>
+                </div>
+                <div class="form-group">
+                    <label>Tidspunkt</label>
+                    <input type="datetime-local" id="event-time">
+                </div>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save"></i> Lagre
+                </button>
+            </form>
+        </div>
+    </section>
+
+    <section id="view-history" class="view">
+        <div id="history-list"></div>
+    </section>
+
+    <section id="view-settings" class="view">
+        <div class="card">
+            <h3>Datahåndtering</h3>
+            <p>Her kan du laste ned dataene dine eller tømme appen.</p>
+            
+            <button class="btn btn-success" onclick="exportToCSV()">
+                <i class="fas fa-file-csv"></i> Eksporter til Excel (CSV)
+            </button>
+            
+            <hr style="margin: 20px 0; border: 0; border-top: 1px solid #eee;">
+            
+            <button class="btn btn-danger" onclick="clearData()">
+                <i class="fas fa-trash"></i> Slett alt (Reset)
+            </button>
+        </div>
+    </section>
+</div>
+
+<nav class="nav-bar">
+    <button class="nav-item active" onclick="showView('dashboard')">
+        <i class="fas fa-home"></i><span>Hjem</span>
+    </button>
+    <button class="nav-item add-btn" onclick="showView('add')">
+        <i class="fas fa-plus-circle"></i><span>Logg</span>
+    </button>
+    <button class="nav-item" onclick="showView('history')">
+        <i class="fas fa-list"></i><span>Logg</span>
+    </button>
+    <button class="nav-item" onclick="showView('settings')">
+        <i class="fas fa-cog"></i><span>Verktøy</span>
+    </button>
+</nav>
+
+<script>
+    // Global funksjon for navigasjon
+    function showView(viewId) {
+        document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+        document.getElementById('view-' + viewId).classList.add('active');
+
+        document.querySelectorAll('.nav-item').forEach(btn => btn.classList.remove('active'));
+        const activeBtn = document.querySelector(`[onclick="showView('${viewId}')"]`);
+        if(activeBtn) activeBtn.classList.add('active');
+
+        const titles = { 'dashboard': 'Dashboard', 'add': 'Registrer', 'history': 'Historikk', 'settings': 'Innstillinger' };
+        document.getElementById('view-title').innerText = titles[viewId];
+
+        if(viewId === 'history') renderHistory();
+        if(viewId === 'dashboard') updateDashboard();
     }
 
-    ReactDOM.render(<App />, document.getElementById('root'));
-  </script>
+    document.addEventListener('DOMContentLoaded', () => {
+        updateDashboard();
+        
+        // Sett klokkeslett til "NÅ"
+        const now = new Date();
+        now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+        document.getElementById('event-time').value = now.toISOString().slice(0,16);
+
+        // Lagre-logikk
+        document.getElementById('event-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const events = JSON.parse(localStorage.getItem('hstats_data') || '[]');
+            
+            events.push({
+                id: Date.now(),
+                type: document.getElementById('event-type').value,
+                value: document.getElementById('event-value').value,
+                time: document.getElementById('event-time').value
+            });
+
+            localStorage.setItem('hstats_data', JSON.stringify(events));
+            e.target.reset();
+            alert('Lagret!');
+            showView('history');
+        });
+    });
+
+    function updateDashboard() {
+        const events = JSON.parse(localStorage.getItem('hstats_data') || '[]');
+        document.getElementById('quick-stats').innerText = `Du har totalt ${events.length} registreringer.`;
+    }
+
+    function renderHistory() {
+        const list = document.getElementById('history-list');
+        const events = JSON.parse(localStorage.getItem('hstats_data') || '[]');
+        
+        if(events.length === 0) {
+            list.innerHTML = '<div class="card">Ingen data ennå.</div>';
+            return;
+        }
+
+        list.innerHTML = events.slice().reverse().map(ev => `
+            <div class="card history-item">
+                <strong>${ev.type}</strong>: ${ev.value}<br>
+                <small>${new Date(ev.time).toLocaleString('no-NO')}</small>
+            </div>
+        `).join('');
+    }
+
+    // --- EKSPORTFUNKSJON ---
+    function exportToCSV() {
+        const events = JSON.parse(localStorage.getItem('hstats_data') || '[]');
+        if(events.length === 0) return alert('Ingen data å eksportere.');
+
+        // Lag CSV-header
+        let csvContent = "Tidspunkt;Type;Verdi\n";
+
+        // Legg til rader
+        events.forEach(ev => {
+            csvContent += `${ev.time};${ev.type};${ev.value}\n`;
+        });
+
+        // Opprett nedlasting
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement("a");
+        const url = URL.createObjectURL(blob);
+        link.setAttribute("href", url);
+        link.setAttribute("download", `hstats_eksport_${new Date().toLocaleDateString()}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+
+    function clearData() {
+        if(confirm("Er du helt sikker? Dette sletter ALL historikk permanent.")) {
+            localStorage.removeItem('hstats_data');
+            updateDashboard();
+            alert("Data er slettet.");
+            showView('dashboard');
+        }
+    }
+</script>
+
 </body>
 </html>
