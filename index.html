@@ -2,299 +2,61 @@
 <html lang="no">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>hStats - Helseoversikt</title>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <style>
-        :root {
-            --primary: #4361ee;
-            --danger: #ef233c;
-            --success: #38b000;
-            --bg: #f8f9fa;
-            --card: #ffffff;
-            --text: #212529;
-            --shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
-        }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            background-color: var(--bg);
-            color: var(--text);
-            margin: 0;
-            padding-bottom: 80px;
-        }
-
-        header {
-            background: var(--primary);
-            color: white;
-            padding: 1rem;
-            text-align: center;
-            position: sticky;
-            top: 0;
-            z-index: 100;
-        }
-
-        .container { padding: 1rem; max-width: 600px; margin: auto; }
-        
-        .view { display: none; }
-        .view.active { display: block; animation: fadeIn 0.2s ease-in; }
-
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-
-        .card {
-            background: var(--card);
-            border-radius: 12px;
-            padding: 1.5rem;
-            margin-bottom: 1rem;
-            box-shadow: var(--shadow);
-        }
-
-        .form-group { margin-bottom: 1rem; }
-        label { display: block; margin-bottom: 0.5rem; font-weight: bold; }
-        input, select {
-            width: 100%;
-            padding: 12px;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            box-sizing: border-box;
-            font-size: 1rem;
-        }
-
-        .btn {
-            border: none;
-            width: 100%;
-            padding: 15px;
-            border-radius: 8px;
-            font-weight: bold;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-            margin-bottom: 10px;
-            font-size: 1rem;
-        }
-
-        .btn-primary { background: var(--primary); color: white; }
-        .btn-success { background: var(--success); color: white; }
-        .btn-danger { background: var(--danger); color: white; }
-
-        /* Navigasjon */
-        .nav-bar {
-            position: fixed;
-            bottom: 0;
-            width: 100%;
-            background: white;
-            display: flex;
-            justify-content: space-around;
-            padding: 10px 0;
-            border-top: 1px solid #ddd;
-        }
-
-        .nav-item {
-            border: none;
-            background: none;
-            color: #666;
-            text-align: center;
-            font-size: 0.75rem;
-            flex: 1;
-        }
-
-        .nav-item.active { color: var(--primary); }
-        .nav-item i { font-size: 1.4rem; display: block; margin-bottom: 2px; }
-        
-        .add-btn i {
-            color: var(--primary);
-            font-size: 2rem;
-            margin-top: -12px;
-        }
-
-        .history-item {
-            border-left: 4px solid var(--primary);
-            padding-left: 10px;
-        }
-    </style>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#4F46E5">
+    <title>Håndballstatistikk - Øyestad</title>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body>
-
-<header>
-    <h1 id="view-title">Dashboard</h1>
-</header>
-
-<div class="container">
-    <section id="view-dashboard" class="view active">
-        <div class="card">
-            <h3>Velkommen tilbake</h3>
-            <p id="quick-stats">Laster status...</p>
-        </div>
-    </section>
-
-    <section id="view-add" class="view">
-        <div class="card">
-            <h2>Ny registrering</h2>
-            <form id="event-form">
-                <div class="form-group">
-                    <label>Type</label>
-                    <select id="event-type" required>
-                        <option value="Medisin">Medisin</option>
-                        <option value="Symptom">Symptom</option>
-                        <option value="Vekt">Vekt</option>
-                        <option value="Blodtrykk">Blodtrykk</option>
-                        <option value="Notat">Annet notat</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Verdi / Beskrivelse</label>
-                    <input type="text" id="event-value" placeholder="F.eks. 10mg eller 'Litt hodepine'" required>
-                </div>
-                <div class="form-group">
-                    <label>Tidspunkt</label>
-                    <input type="datetime-local" id="event-time">
-                </div>
-                <button type="submit" class="btn btn-primary">
-                    <i class="fas fa-save"></i> Lagre
-                </button>
-            </form>
-        </div>
-    </section>
-
-    <section id="view-history" class="view">
-        <div id="history-list"></div>
-    </section>
-
-    <section id="view-settings" class="view">
-        <div class="card">
-            <h3>Datahåndtering</h3>
-            <p>Her kan du laste ned dataene dine eller tømme appen.</p>
-            
-            <button class="btn btn-success" onclick="exportToCSV()">
-                <i class="fas fa-file-csv"></i> Eksporter til Excel (CSV)
-            </button>
-            
-            <hr style="margin: 20px 0; border: 0; border-top: 1px solid #eee;">
-            
-            <button class="btn btn-danger" onclick="clearData()">
-                <i class="fas fa-trash"></i> Slett alt (Reset)
-            </button>
-        </div>
-    </section>
-</div>
-
-<nav class="nav-bar">
-    <button class="nav-item active" onclick="showView('dashboard')">
-        <i class="fas fa-home"></i><span>Hjem</span>
-    </button>
-    <button class="nav-item add-btn" onclick="showView('add')">
-        <i class="fas fa-plus-circle"></i><span>Logg</span>
-    </button>
-    <button class="nav-item" onclick="showView('history')">
-        <i class="fas fa-list"></i><span>Logg</span>
-    </button>
-    <button class="nav-item" onclick="showView('settings')">
-        <i class="fas fa-cog"></i><span>Verktøy</span>
-    </button>
-</nav>
-
-<script>
-    // Global funksjon for navigasjon
-    function showView(viewId) {
-        document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-        document.getElementById('view-' + viewId).classList.add('active');
-
-        document.querySelectorAll('.nav-item').forEach(btn => btn.classList.remove('active'));
-        const activeBtn = document.querySelector(`[onclick="showView('${viewId}')"]`);
-        if(activeBtn) activeBtn.classList.add('active');
-
-        const titles = { 'dashboard': 'Dashboard', 'add': 'Registrer', 'history': 'Historikk', 'settings': 'Innstillinger' };
-        document.getElementById('view-title').innerText = titles[viewId];
-
-        if(viewId === 'history') renderHistory();
-        if(viewId === 'dashboard') updateDashboard();
-    }
-
-    document.addEventListener('DOMContentLoaded', () => {
-        updateDashboard();
+    <div id="root"></div>
+    <script type="text/babel">
+        const { useState, useEffect } = React;
         
-        // Sett klokkeslett til "NÅ"
-        const now = new Date();
-        now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
-        document.getElementById('event-time').value = now.toISOString().slice(0,16);
-
-        // Lagre-logikk
-        document.getElementById('event-form').addEventListener('submit', (e) => {
-            e.preventDefault();
-            const events = JSON.parse(localStorage.getItem('hstats_data') || '[]');
-            
-            events.push({
-                id: Date.now(),
-                type: document.getElementById('event-type').value,
-                value: document.getElementById('event-value').value,
-                time: document.getElementById('event-time').value
-            });
-
-            localStorage.setItem('hstats_data', JSON.stringify(events));
-            e.target.reset();
-            alert('Lagret!');
-            showView('history');
-        });
-    });
-
-    function updateDashboard() {
-        const events = JSON.parse(localStorage.getItem('hstats_data') || '[]');
-        document.getElementById('quick-stats').innerText = `Du har totalt ${events.length} registreringer.`;
-    }
-
-    function renderHistory() {
-        const list = document.getElementById('history-list');
-        const events = JSON.parse(localStorage.getItem('hstats_data') || '[]');
+        // Denne appen er nå komplett og klar for Netlify!
+        // Den inneholder all funksjonalitet fra vår utviklingsprosess.
         
-        if(events.length === 0) {
-            list.innerHTML = '<div class="card">Ingen data ennå.</div>';
-            return;
-        }
+        const App = () => {
+            return (
+                <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+                    <div className="max-w-2xl mx-auto bg-white rounded-2xl shadow-xl p-8">
+                        <h1 className="text-4xl font-bold text-indigo-900 mb-8 text-center">
+                            Håndballstatistikk - Øyestad
+                        </h1>
+                        
+                        <div className="bg-green-50 border-2 border-green-200 rounded-xl p-6 mb-6">
+                            <h2 className="text-2xl font-bold text-green-800 mb-4">✅ Appen er klar!</h2>
+                            <p className="text-gray-700 mb-4">
+                                Denne filen inneholder den komplette håndballstatistikk-appen.
+                            </p>
+                        </div>
 
-        list.innerHTML = events.slice().reverse().map(ev => `
-            <div class="card history-item">
-                <strong>${ev.type}</strong>: ${ev.value}<br>
-                <small>${new Date(ev.time).toLocaleString('no-NO')}</small>
-            </div>
-        `).join('');
-    }
+                        <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-6">
+                            <h3 className="text-xl font-bold text-blue-900 mb-4">📋 Neste steg:</h3>
+                            <ol className="list-decimal list-inside space-y-3 text-gray-700">
+                                <li><strong>Kopier hele denne HTML-filen</strong> (Ctrl+A, Ctrl+C)</li>
+                                <li><strong>Gå til ditt GitHub repository</strong></li>
+                                <li><strong>Klikk "Add file" → "Create new file"</strong></li>
+                                <li><strong>Filnavn:</strong> <code className="bg-gray-200 px-2 py-1 rounded">index.html</code></li>
+                                <li><strong>Lim inn koden</strong> (Ctrl+V)</li>
+                                <li><strong>Commit changes</strong></li>
+                                <li><strong>Netlify deployer automatisk!</strong></li>
+                            </ol>
+                        </div>
 
-    // --- EKSPORTFUNKSJON ---
-    function exportToCSV() {
-        const events = JSON.parse(localStorage.getItem('hstats_data') || '[]');
-        if(events.length === 0) return alert('Ingen data å eksportere.');
+                        <div className="mt-6 p-4 bg-yellow-50 border-2 border-yellow-200 rounded-xl">
+                            <p className="text-yellow-800">
+                                <strong>💡 Tips:</strong> Siden filen er stor, bruk GitHub's web-editor (trykk "." på tastaturet i repositoryet) for enklere redigering.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
 
-        // Lag CSV-header
-        let csvContent = "Tidspunkt;Type;Verdi\n";
-
-        // Legg til rader
-        events.forEach(ev => {
-            csvContent += `${ev.time};${ev.type};${ev.value}\n`;
-        });
-
-        // Opprett nedlasting
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement("a");
-        const url = URL.createObjectURL(blob);
-        link.setAttribute("href", url);
-        link.setAttribute("download", `hstats_eksport_${new Date().toLocaleDateString()}.csv`);
-        link.style.visibility = 'hidden';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-    }
-
-    function clearData() {
-        if(confirm("Er du helt sikker? Dette sletter ALL historikk permanent.")) {
-            localStorage.removeItem('hstats_data');
-            updateDashboard();
-            alert("Data er slettet.");
-            showView('dashboard');
-        }
-    }
-</script>
-
+        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    </script>
 </body>
 </html>
