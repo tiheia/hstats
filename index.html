@@ -1,62 +1,548 @@
-<!DOCTYPE html>
-<html lang="no">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#4F46E5">
-    <title>Håndballstatistikk - Øyestad</title>
-    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body>
-    <div id="root"></div>
-    <script type="text/babel">
-        const { useState, useEffect } = React;
-        
-        // Denne appen er nå komplett og klar for Netlify!
-        // Den inneholder all funksjonalitet fra vår utviklingsprosess.
-        
-        const App = () => {
-            return (
-                <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-                    <div className="max-w-2xl mx-auto bg-white rounded-2xl shadow-xl p-8">
-                        <h1 className="text-4xl font-bold text-indigo-900 mb-8 text-center">
-                            Håndballstatistikk - Øyestad
-                        </h1>
-                        
-                        <div className="bg-green-50 border-2 border-green-200 rounded-xl p-6 mb-6">
-                            <h2 className="text-2xl font-bold text-green-800 mb-4">✅ Appen er klar!</h2>
-                            <p className="text-gray-700 mb-4">
-                                Denne filen inneholder den komplette håndballstatistikk-appen.
-                            </p>
-                        </div>
+import React, { useState, useEffect } from 'react';
+import { Play, Pause, SkipForward, Download, ArrowLeft, Star, Trash2, Edit2, X } from 'lucide-react';
 
-                        <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-6">
-                            <h3 className="text-xl font-bold text-blue-900 mb-4">📋 Neste steg:</h3>
-                            <ol className="list-decimal list-inside space-y-3 text-gray-700">
-                                <li><strong>Kopier hele denne HTML-filen</strong> (Ctrl+A, Ctrl+C)</li>
-                                <li><strong>Gå til ditt GitHub repository</strong></li>
-                                <li><strong>Klikk "Add file" → "Create new file"</strong></li>
-                                <li><strong>Filnavn:</strong> <code className="bg-gray-200 px-2 py-1 rounded">index.html</code></li>
-                                <li><strong>Lim inn koden</strong> (Ctrl+V)</li>
-                                <li><strong>Commit changes</strong></li>
-                                <li><strong>Netlify deployer automatisk!</strong></li>
-                            </ol>
-                        </div>
+const PLAYERS = ['Adrian A', 'Adrian B', 'Demyd', 'Fabian', 'Felix', 'Jacob', 'Jonas', 'Loke', 'Markus', 'Mateo', 'Mats', 'Nicolay', 'Ole', 'Oskar', 'Patrick F', 'Patrick W.', 'Sebastian', 'Stokka', 'Theo', 'Theodor', 'Ulrik'].map(name => ({
+  name,
+  isGoalie: ['Patrick F', 'Theo', 'Ulrik'].includes(name)
+}));
 
-                        <div className="mt-6 p-4 bg-yellow-50 border-2 border-yellow-200 rounded-xl">
-                            <p className="text-yellow-800">
-                                <strong>💡 Tips:</strong> Siden filen er stor, bruk GitHub's web-editor (trykk "." på tastaturet i repositoryet) for enklere redigering.
-                            </p>
-                        </div>
-                    </div>
+export default function App() {
+  const [screen, setScreen] = useState('setup');
+  const [matchType, setMatchType] = useState('Lokal');
+  const [customHalves, setCustomHalves] = useState(2);
+  const [customMinutes, setCustomMinutes] = useState(25);
+  const [opponent, setOpponent] = useState('');
+  const [selectedPlayers, setSelectedPlayers] = useState([]);
+  const [onCourtPlayers, setOnCourtPlayers] = useState([]);
+  const [isRunning, setIsRunning] = useState(false);
+  const [timeRemaining, setTimeRemaining] = useState(1500);
+  const [currentHalf, setCurrentHalf] = useState(0);
+  const [events, setEvents] = useState([]);
+  const [regStep, setRegStep] = useState('player');
+  const [regData, setRegData] = useState({});
+  const [recentPlayers, setRecentPlayers] = useState([]);
+  const [editingEvent, setEditingEvent] = useState(null);
+  const [showTimeoutDialog, setShowTimeoutDialog] = useState(false);
+
+  const totalHalves = matchType === 'Annet' ? customHalves : 2;
+  const minutesPerHalf = matchType === 'Annet' ? customMinutes : 25;
+
+  useEffect(() => {
+    let interval;
+    if (isRunning && timeRemaining > 0) {
+      interval = setInterval(() => setTimeRemaining(prev => prev - 1), 1000);
+    } else if (timeRemaining === 0 && isRunning) {
+      setIsRunning(false);
+    }
+    return () => clearInterval(interval);
+  }, [isRunning, timeRemaining]);
+
+  const formatTime = (s) => `${Math.floor(s/60).toString().padStart(2,'0')}:${(s%60).toString().padStart(2,'0')}`;
+
+  const getSorted = () => {
+    const g = selectedPlayers.filter(p => PLAYERS.find(pl => pl.name === p)?.isGoalie).sort();
+    const f = selectedPlayers.filter(p => !PLAYERS.find(pl => pl.name === p)?.isGoalie).sort();
+    const onCourtG = g.filter(x => onCourtPlayers.includes(x));
+    const onCourtF = f.filter(x => onCourtPlayers.includes(x));
+    const benchG = g.filter(x => !onCourtPlayers.includes(x));
+    const benchF = f.filter(x => !onCourtPlayers.includes(x));
+    return [...onCourtG, ...onCourtF, ...benchG, ...benchF];
+  };
+
+  const getSortedRecent = () => {
+    const onCourt = recentPlayers.filter(p => onCourtPlayers.includes(p));
+    const g = onCourt.filter(p => PLAYERS.find(pl => pl.name === p)?.isGoalie).sort();
+    const f = onCourt.filter(p => !PLAYERS.find(pl => pl.name === p)?.isGoalie).sort();
+    return [...g, ...f].slice(0, 6);
+  };
+
+  const addEvent = (e) => {
+    if (editingEvent) {
+      setEvents(prev => prev.map(ev => ev.id === editingEvent.id ? { ...ev, ...e } : ev));
+      setEditingEvent(null);
+    } else {
+      setEvents(prev => [...prev, { id: Date.now(), half: currentHalf, ...e }]);
+    }
+    setRegStep('player');
+    setRegData({});
+  };
+
+  const addTimeout = (team) => {
+    setEvents(prev => [...prev, { id: Date.now(), half: currentHalf, action: 'Timeout', player: team }]);
+    setShowTimeoutDialog(false);
+    setIsRunning(false);
+  };
+
+  const deleteEvent = (id) => {
+    setEvents(prev => prev.filter(e => e.id !== id));
+  };
+
+  const startEdit = (event) => {
+    setEditingEvent(event);
+    setRegData({ player: event.player, action: event.action, zone: event.zone, assist: event.assist });
+    if (event.action === 'Teknisk') {
+      setRegStep('player');
+    } else if (event.action === 'Mål' && event.assist) {
+      setRegStep('zone');
+    } else if (event.action === 'Mål') {
+      setRegStep('assist');
+    } else if (event.zone) {
+      setRegStep('zone');
+    } else {
+      setRegStep('action');
+    }
+  };
+
+  const downloadCSV = () => {
+    const headers = ['Omgang', 'Spiller', 'Handling', 'Sone', 'Assist'];
+    const rows = events.map(e => [
+      e.half,
+      e.player,
+      e.action,
+      e.zone || '',
+      e.assist || ''
+    ]);
+    
+    const csv = [headers, ...rows].map(row => row.join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `haandball_${opponent}_${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+  };
+
+  const getStats = (half) => {
+    const evs = events.filter(e => half === 'all' || e.half === half);
+    const zoneCount = (action) => evs.filter(e => e.action === action).reduce((acc, e) => ({ ...acc, [e.zone]: (acc[e.zone] || 0) + 1 }), {});
+    return {
+      goals: evs.filter(e => e.action === 'Mål').length,
+      misses: evs.filter(e => e.action === 'Bom').length,
+      technical: evs.filter(e => e.action === 'Teknisk').length,
+      goalsAgainst: evs.filter(e => e.action === 'Mål imot').length,
+      saves: evs.filter(e => e.action === 'Redning').length,
+      goalZones: zoneCount('Mål'),
+      missZones: zoneCount('Bom'),
+      saveZones: zoneCount('Redning'),
+      againstZones: zoneCount('Mål imot')
+    };
+  };
+
+  if (screen === 'setup') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+        <div className="max-w-2xl mx-auto bg-white rounded-2xl shadow-xl p-8">
+          <h1 className="text-4xl font-bold text-indigo-900 mb-8 text-center">Håndballstatistikk</h1>
+          <div className="space-y-6">
+            <div>
+              <label className="block text-lg font-semibold text-gray-700 mb-3">Serie</label>
+              <div className="grid grid-cols-3 gap-3">
+                {['Lokal', 'Region', 'Annet'].map(type => (
+                  <button key={type} onClick={() => setMatchType(type)} className={`py-3 px-4 rounded-xl font-medium ${matchType === type ? 'bg-indigo-600 text-white shadow-lg' : 'bg-gray-100 text-gray-700'}`}>
+                    {type}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {matchType === 'Annet' && (
+              <div className="grid grid-cols-2 gap-4 p-4 bg-indigo-50 rounded-xl">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Antall omganger</label>
+                  <input type="number" min="1" value={customHalves} onChange={(e) => setCustomHalves(parseInt(e.target.value))} className="w-full px-4 py-2 border-2 border-indigo-200 rounded-lg" />
                 </div>
-            );
-        };
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Minutter per omgang</label>
+                  <input type="number" min="1" value={customMinutes} onChange={(e) => setCustomMinutes(parseInt(e.target.value))} className="w-full px-4 py-2 border-2 border-indigo-200 rounded-lg" />
+                </div>
+              </div>
+            )}
 
-        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
-    </script>
-</body>
-</html>
+            <div>
+              <label className="block text-lg font-semibold text-gray-700 mb-3">Motstander</label>
+              <input type="text" value={opponent} onChange={(e) => setOpponent(e.target.value)} placeholder="Navn på motstander" className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 text-lg" />
+            </div>
+            <div>
+              <label className="block text-lg font-semibold text-gray-700 mb-3">Velg spillere</label>
+              <div className="grid grid-cols-2 gap-2 max-h-96 overflow-y-auto p-2 bg-gray-50 rounded-xl">
+                {PLAYERS.map(p => (
+                  <button key={p.name} onClick={() => setSelectedPlayers(prev => prev.includes(p.name) ? prev.filter(x => x !== p.name) : [...prev, p.name])} className={`py-2 px-3 rounded-lg text-left ${selectedPlayers.includes(p.name) ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 border-2 border-gray-200'}`}>
+                    {p.name} {p.isGoalie && '🥅'}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <button onClick={() => { setScreen('lineup'); setCurrentHalf(1); setTimeRemaining(minutesPerHalf * 60); }} disabled={!opponent || !selectedPlayers.length} className="w-full py-4 bg-indigo-600 text-white text-xl font-bold rounded-xl disabled:opacity-50">
+              Neste
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (screen === 'lineup') {
+    const sorted = getSorted();
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+        <div className="max-w-2xl mx-auto bg-white rounded-2xl shadow-xl p-8">
+          <h1 className="text-3xl font-bold text-indigo-900 mb-6">Velg startoppstilling - Omgang {currentHalf}</h1>
+          <p className="text-gray-600 mb-4">Velg spillere som skal være på banen når omgangen starter</p>
+          <div className="grid grid-cols-3 gap-2 mb-6">
+            {sorted.map(p => (
+              <button key={p} onClick={() => setOnCourtPlayers(prev => prev.includes(p) ? prev.filter(x => x !== p) : [...prev, p])} className={`py-3 px-3 rounded-lg text-sm flex items-center gap-1 ${onCourtPlayers.includes(p) ? 'bg-yellow-400 text-gray-900 font-semibold' : 'bg-gray-100 text-gray-600'}`}>
+                {onCourtPlayers.includes(p) && <Star size={14} className="fill-current"/>}
+                {p}
+              </button>
+            ))}
+          </div>
+          <div className="flex gap-3">
+            <button onClick={() => setScreen(currentHalf === 1 ? 'setup' : 'summary')} className="flex-1 py-3 bg-gray-600 text-white font-bold rounded-xl">
+              Tilbake
+            </button>
+            <button onClick={() => setScreen('match')} className="flex-1 py-3 bg-indigo-600 text-white font-bold rounded-xl">
+              Start omgang
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (screen === 'summary') {
+    const stats = getStats(currentHalf - 1);
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+        <div className="max-w-3xl mx-auto bg-white rounded-2xl shadow-xl p-8">
+          <h2 className="text-3xl font-bold text-indigo-900 mb-6">Sammendrag - Omgang {currentHalf - 1}</h2>
+          <div className="grid grid-cols-2 gap-4 mb-6">
+            <div className="bg-green-50 p-4 rounded-xl border-2 border-green-200">
+              <div className="text-3xl font-bold text-green-700">{stats.goals}</div>
+              <div className="text-gray-700 font-semibold">Mål scoret</div>
+              {Object.entries(stats.goalZones).map(([z, c]) => <div key={z} className="text-sm">{z}: {c}</div>)}
+            </div>
+            <div className="bg-red-50 p-4 rounded-xl border-2 border-red-200">
+              <div className="text-3xl font-bold text-red-700">{stats.goalsAgainst}</div>
+              <div className="text-gray-700 font-semibold">Mål imot</div>
+              {Object.entries(stats.againstZones).map(([z, c]) => <div key={z} className="text-sm">{z}: {c}</div>)}
+            </div>
+            <div className="bg-orange-50 p-4 rounded-xl border-2 border-orange-200">
+              <div className="text-3xl font-bold text-orange-700">{stats.misses}</div>
+              <div className="text-gray-700 font-semibold">Bom</div>
+            </div>
+            <div className="bg-yellow-50 p-4 rounded-xl border-2 border-yellow-200">
+              <div className="text-3xl font-bold text-yellow-700">{stats.technical}</div>
+              <div className="text-gray-700 font-semibold">Tekniske feil</div>
+            </div>
+          </div>
+          <button onClick={() => { setScreen('match'); setTimeRemaining(minutesPerHalf * 60); }} className="w-full py-4 bg-indigo-600 text-white text-xl font-bold rounded-xl">
+            Fortsett til omgang {currentHalf}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (screen === 'final') {
+    const stats = getStats('all');
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+        <div className="max-w-4xl mx-auto bg-white rounded-2xl shadow-xl p-8">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-3xl font-bold text-indigo-900">Kampstatistikk - {opponent}</h2>
+            <div className="flex gap-2">
+              <button onClick={downloadCSV} className="p-2 hover:bg-gray-100 rounded-lg" title="Last ned CSV">
+                <Download className="w-6 h-6 text-indigo-600" />
+              </button>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4 mb-6">
+            <div className="bg-green-50 p-6 rounded-xl border-2 border-green-200">
+              <div className="text-4xl font-bold text-green-700">{stats.goals}</div>
+              <div className="text-lg font-semibold mb-2">Mål scoret</div>
+              {Object.entries(stats.goalZones).sort((a,b) => b[1]-a[1]).map(([z,c]) => <div key={z} className="flex justify-between text-sm"><span>{z}:</span><span className="font-semibold">{c}</span></div>)}
+            </div>
+            <div className="bg-red-50 p-6 rounded-xl border-2 border-red-200">
+              <div className="text-4xl font-bold text-red-700">{stats.goalsAgainst}</div>
+              <div className="text-lg font-semibold mb-2">Mål imot</div>
+              {Object.entries(stats.againstZones).sort((a,b) => b[1]-a[1]).map(([z,c]) => <div key={z} className="flex justify-between text-sm"><span>{z}:</span><span className="font-semibold">{c}</span></div>)}
+            </div>
+            <div className="bg-orange-50 p-6 rounded-xl border-2 border-orange-200">
+              <div className="text-4xl font-bold text-orange-700">{stats.misses}</div>
+              <div className="text-lg font-semibold mb-2">Bom</div>
+              {Object.entries(stats.missZones).sort((a,b) => b[1]-a[1]).map(([z,c]) => <div key={z} className="flex justify-between text-sm"><span>{z}:</span><span className="font-semibold">{c}</span></div>)}
+            </div>
+            <div className="bg-yellow-50 p-6 rounded-xl border-2 border-yellow-200">
+              <div className="text-4xl font-bold text-yellow-700">{stats.technical}</div>
+              <div className="text-lg font-semibold">Tekniske feil</div>
+            </div>
+          </div>
+          <div className="flex gap-3">
+            <button onClick={downloadCSV} className="flex-1 py-4 bg-blue-600 text-white text-xl font-bold rounded-xl hover:bg-blue-700 flex items-center justify-center gap-2">
+              <Download size={24} />
+              Last ned CSV
+            </button>
+            <button onClick={() => { setScreen('setup'); setEvents([]); setSelectedPlayers([]); setOnCourtPlayers([]); setCurrentHalf(0); setOpponent(''); }} className="flex-1 py-4 bg-indigo-600 text-white text-xl font-bold rounded-xl hover:bg-indigo-700">
+              Avslutt og tilbake
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const sorted = getSorted();
+  const onCourt = sorted.filter(p => onCourtPlayers.includes(p));
+  const bench = sorted.filter(p => !onCourtPlayers.includes(p));
+  const frequent = getSortedRecent();
+  const isGoalie = PLAYERS.find(p => p.name === regData.player)?.isGoalie;
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+      <div className="max-w-4xl mx-auto">
+        <div className="bg-white rounded-2xl shadow-xl p-6 mb-4">
+          <h2 className="text-2xl font-bold text-indigo-900 mb-4">{opponent} - Omgang {currentHalf}/{totalHalves}</h2>
+          <div className="text-center mb-4">
+            <div className="text-6xl font-bold text-indigo-900 mb-4">{formatTime(timeRemaining)}</div>
+            <div className="flex gap-3 justify-center">
+              <button onClick={() => setIsRunning(!isRunning)} className="px-6 py-3 bg-indigo-600 text-white rounded-xl font-semibold flex items-center gap-2">
+                {isRunning ? <><Pause size={20}/> Stopp</> : <><Play size={20}/> Start</>}
+              </button>
+              {isRunning && (
+                <button onClick={() => setShowTimeoutDialog(true)} className="px-6 py-3 bg-yellow-600 text-white rounded-xl font-semibold">
+                  Timeout
+                </button>
+              )}
+              <button onClick={() => currentHalf < totalHalves ? (setCurrentHalf(prev => prev + 1), setScreen('summary'), setIsRunning(false)) : (setScreen('final'), setIsRunning(false))} className="px-6 py-3 bg-green-600 text-white rounded-xl font-semibold flex items-center gap-2">
+                <SkipForward size={20}/> {currentHalf < totalHalves ? 'Neste omgang' : 'Avslutt'}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {showTimeoutDialog && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-2xl p-8 max-w-md">
+              <h3 className="text-2xl font-bold text-indigo-900 mb-6">Hvem tok timeout?</h3>
+              <div className="flex gap-4">
+                <button onClick={() => addTimeout('Øyestad')} className="flex-1 py-4 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700">
+                  Øyestad
+                </button>
+                <button onClick={() => addTimeout(opponent)} className="flex-1 py-4 bg-gray-600 text-white font-bold rounded-xl hover:bg-gray-700">
+                  {opponent}
+                </button>
+              </div>
+              <button onClick={() => setShowTimeoutDialog(false)} className="w-full mt-4 py-3 bg-gray-200 text-gray-700 font-semibold rounded-xl">
+                Avbryt
+              </button>
+            </div>
+          </div>
+        )}
+
+        {!isRunning ? (
+          <div className="bg-white rounded-2xl shadow-xl p-6">
+            <p className="text-xl text-gray-600 text-center py-8">Start klokken for å registrere hendelser</p>
+            <EventLog events={events} currentHalf={currentHalf} deleteEvent={deleteEvent} startEdit={startEdit} />
+          </div>
+        ) : (
+          <div className="bg-white rounded-2xl shadow-xl p-6">
+            {regStep === 'player' && (
+              <>
+                {editingEvent && (
+                  <div className="mb-4 flex items-center justify-between">
+                    <h3 className="text-2xl font-bold text-indigo-900">Rediger hendelse</h3>
+                    <button onClick={() => { setEditingEvent(null); setRegData({}); }} className="p-2 hover:bg-gray-100 rounded-lg">
+                      <X size={24} className="text-gray-600" />
+                    </button>
+                  </div>
+                )}
+                {frequent.length > 0 && (
+                  <div className="mb-4">
+                    <h4 className="font-semibold text-sm text-gray-600 mb-2">⚡ Mest brukte</h4>
+                    <div className="grid grid-cols-3 gap-3">
+                      {getSortedRecent().map(p => (
+                        <button key={p} onClick={() => { setRegData({ player: p }); setRegStep('action'); setRecentPlayers(prev => [p, ...prev.filter(x => x !== p)].slice(0, 6)); }} className="py-5 px-4 rounded-xl bg-gradient-to-br from-indigo-600 to-indigo-700 text-white font-bold text-lg flex items-center gap-2">
+                          <Star size={20} className="fill-current text-yellow-400"/>
+                          {p}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <div className="mb-4">
+                  <div className="grid grid-cols-2 gap-3">
+                    {onCourt.filter(p => !frequent.includes(p)).map(p => (
+                      <button key={p} onClick={() => { setRegData({ player: p }); setRegStep('action'); setRecentPlayers(prev => [p, ...prev.filter(x => x !== p)].slice(0, 6)); }} className="py-4 px-4 rounded-xl bg-indigo-600 text-white font-semibold text-lg flex items-center gap-2">
+                        <Star size={16} className="fill-current text-yellow-400"/>
+                        {p}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {bench.length > 0 && (
+                  <div className="mb-4">
+                    <div className="grid grid-cols-2 gap-2">
+                      {bench.map(p => (
+                        <button key={p} onClick={() => { setRegData({ player: p }); setRegStep('action'); setRecentPlayers(prev => [p, ...prev.filter(x => x !== p)].slice(0, 6)); }} className="py-3 px-3 rounded-lg bg-gray-200 text-gray-700 font-medium">
+                          {p}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <div className="border-t pt-4">
+                  <h4 className="font-semibold text-sm text-gray-600 mb-2">Bytt spillere på banen</h4>
+                  <div className="grid grid-cols-3 gap-2">
+                    {sorted.map(p => (
+                      <button key={p} onClick={() => setOnCourtPlayers(prev => prev.includes(p) ? prev.filter(x => x !== p) : [...prev, p])} className={`py-2 px-2 rounded-lg text-xs flex items-center gap-1 ${onCourtPlayers.includes(p) ? 'bg-yellow-400 text-gray-900 font-semibold' : 'bg-gray-100 text-gray-600'}`}>
+                        {onCourtPlayers.includes(p) && <Star size={12} className="fill-current"/>}
+                        {p}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
+
+            {regStep === 'action' && (
+              <>
+                <button onClick={() => { setRegStep('player'); setRegData({}); }} className="mb-4 flex items-center gap-2 text-indigo-600">
+                  <ArrowLeft size={20}/> Tilbake
+                </button>
+                <h3 className="text-2xl font-bold text-indigo-900 mb-2">{regData.player}</h3>
+                <p className="text-gray-600 mb-6">Velg handling</p>
+                <div className="grid grid-cols-2 gap-3">
+                  {isGoalie ? (
+                    <>
+                      <button onClick={() => { setRegData({ ...regData, action: 'Redning' }); setRegStep('zone'); }} className="py-6 rounded-xl font-bold text-xl bg-green-600 text-white">Redning</button>
+                      <button onClick={() => { setRegData({ ...regData, action: 'Mål imot' }); setRegStep('zone'); }} className="py-6 rounded-xl font-bold text-xl bg-red-600 text-white">Mål imot</button>
+                    </>
+                  ) : (
+                    <>
+                      <button onClick={() => { setRegData({ ...regData, action: 'Mål' }); setRegStep('assist'); }} className="py-6 rounded-xl font-bold text-xl bg-green-600 text-white">Mål</button>
+                      <button onClick={() => { setRegData({ ...regData, action: 'Bom' }); setRegStep('zone'); }} className="py-6 rounded-xl font-bold text-xl bg-red-600 text-white">Bom</button>
+                      <button onClick={() => addEvent({ ...regData, action: 'Teknisk' })} className="py-6 rounded-xl font-bold text-xl bg-yellow-600 text-white col-span-2">Teknisk</button>
+                    </>
+                  )}
+                </div>
+              </>
+            )}
+
+            {regStep === 'assist' && (
+              <>
+                <button onClick={() => { setRegStep('action'); setRegData({ player: regData.player }); }} className="mb-4 flex items-center gap-2 text-indigo-600">
+                  <ArrowLeft size={20}/> Tilbake
+                </button>
+                <h3 className="text-2xl font-bold text-indigo-900 mb-2">{regData.player} - Mål</h3>
+                <p className="text-gray-600 mb-6">Hvem hadde assist?</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <button onClick={() => { setRegData({ ...regData, assist: 'Ingen' }); setRegStep('zone'); }} className="py-4 rounded-xl font-semibold text-lg bg-gray-600 text-white col-span-2">Ingen assist</button>
+                  {onCourtPlayers
+                    .filter(p => p !== regData.player)
+                    .sort((a, b) => {
+                      const aAssists = events.filter(e => e.assist === a).length;
+                      const bAssists = events.filter(e => e.assist === b).length;
+                      if (aAssists !== bAssists) return bAssists - aAssists;
+                      return a.localeCompare(b);
+                    })
+                    .map(p => {
+                      const assistCount = events.filter(e => e.assist === p).length;
+                      return (
+                        <button key={p} onClick={() => { setRegData({ ...regData, assist: p }); setRegStep('zone'); }} className="py-4 rounded-xl font-semibold text-lg bg-indigo-600 text-white relative">
+                          {p}
+                          {assistCount > 0 && (
+                            <span className="absolute top-1 right-1 bg-yellow-400 text-gray-900 text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center">
+                              {assistCount}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                </div>
+              </>
+            )}
+
+            {regStep === 'zone' && (
+              <>
+                <button onClick={() => { setRegStep(regData.action === 'Mål' ? 'assist' : 'action'); }} className="mb-4 flex items-center gap-2 text-indigo-600">
+                  <ArrowLeft size={20}/> Tilbake
+                </button>
+                <h3 className="text-2xl font-bold text-indigo-900 mb-2">{regData.player}</h3>
+                <p className="text-gray-600 mb-6">{regData.action} - Velg sone</p>
+                <div className="grid grid-cols-4 gap-3 mb-4">
+                  {[1,2,3,4,5,6,7,8].map(n => (
+                    <button key={n} onClick={() => addEvent({ ...regData, zone: `Sone ${n}` })} className="py-6 bg-blue-600 text-white font-bold rounded-xl text-2xl">{n}</button>
+                  ))}
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <button onClick={() => addEvent({ ...regData, zone: 'Straffekast' })} className="py-4 bg-purple-600 text-white font-bold rounded-xl">Straffekast (7m)</button>
+                  <button onClick={() => addEvent({ ...regData, zone: 'Kontring' })} className="py-4 bg-yellow-600 text-white font-bold rounded-xl">Kontring</button>
+                </div>
+              </>
+            )}
+
+            <EventLog events={events} currentHalf={currentHalf} deleteEvent={deleteEvent} startEdit={startEdit} />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function EventLog({ events, currentHalf, deleteEvent, startEdit }) {
+  const groupedEvents = events.reduce((acc, event) => {
+    if (!acc[event.half]) acc[event.half] = [];
+    acc[event.half].push(event);
+    return acc;
+  }, {});
+
+  const halves = Object.keys(groupedEvents).sort((a, b) => b - a);
+
+  if (events.length === 0) return null;
+
+  return (
+    <div className="border-t pt-4 mt-4">
+      <h4 className="font-semibold text-lg mb-3 text-gray-700">Hendelser</h4>
+      <div className="space-y-4 max-h-96 overflow-y-auto">
+        {halves.map(half => (
+          <div key={half}>
+            {halves.length > 1 && (
+              <div className="flex items-center gap-2 mb-2">
+                <div className="flex-1 h-px bg-gray-300"></div>
+                <span className="text-xs font-semibold text-gray-500 px-2">Omgang {half}</span>
+                <div className="flex-1 h-px bg-gray-300"></div>
+              </div>
+            )}
+            <div className="space-y-2">
+              {[...groupedEvents[half]].reverse().map(event => (
+                <div key={event.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <div className="text-sm flex-1">
+                    {event.action === 'Timeout' ? (
+                      <span className="font-semibold text-yellow-700">⏱️ Timeout - {event.player}</span>
+                    ) : (
+                      <>
+                        <span className="font-semibold">{event.player}</span> - {event.action}
+                        {event.zone && ` (${event.zone})`}
+                        {event.assist && event.assist !== 'Ingen' && ` - Assist: ${event.assist}`}
+                      </>
+                    )}
+                  </div>
+                  {event.action !== 'Timeout' && (
+                    <div className="flex gap-2">
+                      <button onClick={() => startEdit(event)} className="p-1 hover:bg-blue-100 rounded">
+                        <Edit2 size={16} className="text-blue-600" />
+                      </button>
+                      <button onClick={() => deleteEvent(event.id)} className="p-1 hover:bg-red-100 rounded">
+                        <Trash2 size={16} className="text-red-600" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
