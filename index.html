@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="theme-color" content="#4F46E5">
+    <title>Håndballstatistikk - Øyestad</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        * { -webkit-tap-highlight-color: transparent; }
+        body { overscroll-behavior: none; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        const PLAYERS = ['Adrian A', 'Adrian B', 'Demyd', 'Fabian', 'Felix', 'Jacob', 'Jonas', 'Loke', 'Markus', 'Mateo', 'Mats', 'Nicolay', 'Ole', 'Oskar', 'Patrick F', 'Patrick W.', 'Sebastian', 'Stokka', 'Theo', 'Theodor', 'Ulrik'].map(name => ({
+          name,
+          isGoalie: ['Patrick F', 'Theo', 'Ulrik'].includes(name)
+        }));
+
+        const Play = ({ size = 24 }) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>;
+        const Pause = ({ size = 24 }) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>;
+        const SkipForward = ({ size = 24 }) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="5 4 15 12 5 20 5 4"></polygon><line x1="19" y1="5" x2="19" y2="19"></line></svg>;
+        const Download = ({ size = 24 }) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>;
+        const Star = ({ size = 24, className = "" }) => <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" className={className}><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>;
+        const ArrowLeft = ({ size = 24 }) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>;
+        const Edit2 = ({ size = 24, className = "" }) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className}><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>;
+        const Trash2 = ({ size = 24, className = "" }) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className}><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>;
+        const X = ({ size = 24 }) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>;
+
+        function App() {
+          const [screen, setScreen] = useState('setup');
+          const [matchType, setMatchType] = useState('Lokal');
+          const [customHalves, setCustomHalves] = useState(2);
+          const [customMinutes, setCustomMinutes] = useState(25);
+          const [opponent, setOpponent] = useState('');
+          const [selectedPlayers, setSelectedPlayers] = useState([]);
+          const [onCourtPlayers, setOnCourtPlayers] = useState([]);
+          const [isRunning, setIsRunning] = useState(false);
+          const [timeRemaining, setTimeRemaining] = useState(1500);
+          const [currentHalf, setCurrentHalf] = useState(0);
+          const [events, setEvents] = useState([]);
+          const [regStep, setRegStep] = useState('player');
+          const [regData, setRegData] = useState({});
+          const [recentPlayers, setRecentPlayers] = useState([]);
+          const [editingEvent, setEditingEvent] = useState(null);
+          const [showTimeoutDialog, setShowTimeoutDialog] = useState(false);
+
+          const totalHalves = matchType === 'Annet' ? customHalves : 2;
+          const minutesPerHalf = matchType === 'Annet' ? customMinutes : 25;
+
+          useEffect(() => {
+            let interval;
+            if (isRunning && timeRemaining > 0) {
+              interval = setInterval(() => setTimeRemaining(prev => prev - 1), 1000);
+            } else if (timeRemaining === 0 && isRunning) {
+              setIsRunning(false);
+            }
+            return () => clearInterval(interval);
+          }, [isRunning, timeRemaining]);
+
+          const formatTime = (s) => \`\${Math.floor(s/60).toString().padStart(2,'0')}:\${(s%60).toString().padStart(2,'0')}\`;
+
+          const getSorted = () => {
+            const g = selectedPlayers.filter(p => PLAYERS.find(pl => pl.name === p)?.isGoalie).sort();
+            const f = selectedPlayers.filter(p => !PLAYERS.find(pl => pl.name === p)?.isGoalie).sort();
+            const onCourtG = g.filter(x => onCourtPlayers.includes(x));
+            const onCourtF = f.filter(x => onCourtPlayers.includes(x));
+            const benchG = g.filter(x => !onCourtPlayers.includes(x));
+            const benchF = f.filter(x => !onCourtPlayers.includes(x));
+            return [...onCourtG, ...onCourtF, ...benchG, ...benchF];
+          };
+
+          const getSortedRecent = () => {
+            const onCourt = recentPlayers.filter(p => onCourtPlayers.includes(p));
+            const g = onCourt.filter(p => PLAYERS.find(pl => pl.name === p)?.isGoalie).sort();
+            const f = onCourt.filter(p => !PLAYERS.find(pl => pl.name === p)?.isGoalie).sort();
+            return [...g, ...f].slice(0, 6);
+          };
+
+          const downloadCSV = () => {
+            const headers = ['Omgang', 'Spiller', 'Handling', 'Sone', 'Assist'];
+            const rows = events.map(e => [e.half, e.player, e.action, e.zone || '', e.assist || '']);
+            const csv = [headers, ...rows].map(row => row.join(',')).join('\\n');
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = \`haandball_\${opponent}_\${new Date().toISOString().split('T')[0]}.csv\`;
+            a.click();
+            URL.revokeObjectURL(url);
+          };
+
+          if (screen === 'setup') {
+            return (
+              <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+                <div className="max-w-2xl mx-auto bg-white rounded-2xl shadow-xl p-8">
+                  <h1 className="text-4xl font-bold text-indigo-900 mb-8 text-center">Håndballstatistikk</h1>
+                  <div className="text-center text-green-600 font-semibold mb-4">✅ Klar til bruk!</div>
+                  <div className="space-y-6">
+                    <div>
+                      <label className="block text-lg font-semibold text-gray-700 mb-3">Serie</label>
+                      <div className="grid grid-cols-3 gap-3">
+                        {['Lokal', 'Region', 'Annet'].map(type => (
+                          <button key={type} onClick={() => setMatchType(type)} className={\`py-3 px-4 rounded-xl font-medium \${matchType === type ? 'bg-indigo-600 text-white shadow-lg' : 'bg-gray-100 text-gray-700'}\`}>
+                            {type}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {matchType === 'Annet' && (
+                      <div className="grid grid-cols-2 gap-4 p-4 bg-indigo-50 rounded-xl">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">Antall omganger</label>
+                          <input type="number" min="1" value={customHalves} onChange={(e) => setCustomHalves(parseInt(e.target.value))} className="w-full px-4 py-2 border-2 border-indigo-200 rounded-lg" />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">Minutter per omgang</label>
+                          <input type="number" min="1" value={customMinutes} onChange={(e) => setCustomMinutes(parseInt(e.target.value))} className="w-full px-4 py-2 border-2 border-indigo-200 rounded-lg" />
+                        </div>
+                      </div>
+                    )}
+
+                    <div>
+                      <label className="block text-lg font-semibold text-gray-700 mb-3">Motstander</label>
+                      <input type="text" value={opponent} onChange={(e) => setOpponent(e.target.value)} placeholder="Navn på motstander" className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 text-lg" />
+                    </div>
+                    <div>
+                      <label className="block text-lg font-semibold text-gray-700 mb-3">Velg spillere</label>
+                      <div className="grid grid-cols-2 gap-2 max-h-96 overflow-y-auto p-2 bg-gray-50 rounded-xl">
+                        {PLAYERS.map(p => (
+                          <button key={p.name} onClick={() => setSelectedPlayers(prev => prev.includes(p.name) ? prev.filter(x => x !== p.name) : [...prev, p.name])} className={\`py-2 px-3 rounded-lg text-left \${selectedPlayers.includes(p.name) ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 border-2 border-gray-200'}\`}>
+                            {p.name} {p.isGoalie && '🥅'}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <button onClick={() => { setScreen('lineup'); setCurrentHalf(1); setTimeRemaining(minutesPerHalf * 60); }} disabled={!opponent || !selectedPlayers.length} className="w-full py-4 bg-indigo-600 text-white text-xl font-bold rounded-xl disabled:opacity-50">
+                      Neste
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          }
+
+          return <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4 flex items-center justify-center"><div className="text-2xl text-indigo-900">Laster...</div></div>;
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
